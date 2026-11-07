@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>To-Do List dApp — Жеке тапсырмалар тізімі</title>
+  <meta name="description" content="Ethereum блокчейніндегі жеке тапсырмалар тізімі (Solidity + ethers.js + MetaMask)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11.5' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ═════════════ Жоғарғы панель ═════════════ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      </div>
+      <div>
+        <h1>To-Do List <span class="tag">dApp</span></h1>
+        <p class="subtitle">Жеке тапсырмалар тізімі · Ethereum блокчейнінде</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="networkBadge" class="badge badge-muted" hidden></span>
+      <button id="connectBtn" class="btn btn-primary">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1h1a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="16" cy="12" r="1.3"/></svg>
+        <span>Connect Wallet</span>
+      </button>
+      <div id="accountChip" class="account-chip" hidden>
+        <span class="dot"></span>
+        <span id="accountShort"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Хабарламалар жолағы (MetaMask жоқ / демо режимі) -->
+  <div id="banner" class="banner" hidden></div>
+
+  <main class="layout">
+
+    <!-- ═════════════ Сол жақ баған ═════════════ -->
+    <section class="col">
+
+      <!-- Әмиян -->
+      <article class="card">
+        <div class="card-head">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1h1a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          </div>
+          <h2>Әмиян</h2>
+        </div>
+        <dl class="kv">
+          <div><dt>Күйі</dt><dd id="walletStatus">Қосылмаған</dd></div>
+          <div><dt>Адрес</dt><dd id="walletAddress" class="mono">—</dd></div>
+          <div><dt>Желі</dt><dd id="walletNetwork">—</dd></div>
+          <div><dt>Баланс</dt><dd id="walletBalance" class="mono">—</dd></div>
+        </dl>
+      </article>
+
+      <!-- Контракт -->
+      <article class="card">
+        <div class="card-head">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13l-2 2 2 2M15 13l2 2-2 2"/></svg>
+          </div>
+          <h2>Смарт-контракт</h2>
+        </div>
+        <label class="field">
+          <span>TodoList контрактының адресі</span>
+          <input id="contractInput" class="input mono" placeholder="0x..." autocomplete="off" spellcheck="false">
+        </label>
+        <button id="contractBtn" class="btn btn-secondary btn-block">Контрактқа қосылу</button>
+        <p id="contractStatus" class="hint">Remix-те Deploy жасалған контракт адресін енгізіңіз.</p>
+      </article>
+
+      <!-- Жаңа тапсырма -->
+      <article class="card">
+        <div class="card-head">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </div>
+          <h2>Жаңа тапсырма</h2>
+        </div>
+        <form id="addForm" autocomplete="off">
+          <label class="field">
+            <span>Тапсырма мәтіні</span>
+            <textarea id="taskInput" class="input" rows="2" placeholder="Мысалы: №6 зертханалық жұмысты тапсыру"></textarea>
+            <small id="byteCounter" class="counter">0 / 200 байт</small>
+          </label>
+          <label class="field">
+            <span>Маңыздылығы</span>
+            <select id="priorityInput" class="input">
+              <option value="0">Төмен</option>
+              <option value="1" selected>Орташа</option>
+              <option value="2">Жоғары</option>
+            </select>
+          </label>
+          <button id="addBtn" type="submit" class="btn btn-primary btn-block" disabled>Тапсырма қосу</button>
+        </form>
+      </article>
+
+      <!-- ID бойынша іздеу -->
+      <article class="card">
+        <div class="card-head">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+          </div>
+          <h2>ID бойынша іздеу</h2>
+        </div>
+        <form id="findForm" class="row" autocomplete="off">
+          <input id="findInput" class="input" type="number" min="1" step="1" placeholder="Тапсырма ID">
+          <button id="findBtn" type="submit" class="btn btn-secondary" disabled>Іздеу</button>
+        </form>
+        <div id="findResult" class="find-result" hidden></div>
+      </article>
+    </section>
+
+    <!-- ═════════════ Оң жақ баған ═════════════ -->
+    <section class="col col-wide">
+
+      <!-- Тапсырмалар тізімі -->
+      <article class="card">
+        <div class="card-head card-head-split">
+          <div class="card-head">
+            <div class="card-icon">
+              <svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>
+            </div>
+            <h2>Менің тапсырмаларым</h2>
+          </div>
+          <button id="refreshBtn" class="btn btn-ghost btn-sm" title="Блокчейннен қайта оқу" disabled>
+            <svg class="icon" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+            <span>Жаңарту</span>
+          </button>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><span id="statTotal" class="stat-num">0</span><span class="stat-label">Барлығы</span></div>
+          <div class="stat"><span id="statDone" class="stat-num">0</span><span class="stat-label">Орындалды</span></div>
+          <div class="stat"><span id="statLeft" class="stat-num">0</span><span class="stat-label">Қалды</span></div>
+          <div class="stat stat-progress">
+            <div class="progress"><div id="progressBar" class="progress-bar" style="width:0%"></div></div>
+            <span id="statPercent" class="stat-label">0% орындалды</span>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-filter="all" role="tab">Барлығы</button>
+            <button class="tab" data-filter="active" role="tab">Белсенді</button>
+            <button class="tab" data-filter="done" role="tab">Орындалған</button>
+          </div>
+          <input id="searchInput" class="input input-sm" placeholder="Мәтін бойынша сүзу…" autocomplete="off">
+        </div>
+
+        <ul id="taskList" class="task-list"></ul>
+        <div id="emptyState" class="empty">
+          <svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>
+          <p id="emptyText">Тапсырмаларды көру үшін әмиянды қосыңыз.</p>
+        </div>
+      </article>
+
+      <!-- Транзакциялар журналы -->
+      <article class="card">
+        <div class="card-head card-head-split">
+          <div class="card-head">
+            <div class="card-icon">
+              <svg viewBox="0 0 24 24"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg>
+            </div>
+            <h2>Транзакциялар журналы</h2>
+          </div>
+          <button id="clearLogBtn" class="btn btn-ghost btn-sm">Тазалау</button>
+        </div>
+        <ul id="txLog" class="tx-log"></ul>
+        <p id="txEmpty" class="hint">Әзірге транзакция жоқ. Әр жазу операциясы (қосу, белгілеу, өзгерту, өшіру) осында көрінеді.</p>
+      </article>
+    </section>
+  </main>
+
+  <!-- ═════════════ dApp архитектурасы ═════════════ -->
+  <section class="arch">
+    <h3>dApp қалай жұмыс істейді</h3>
+    <div class="arch-flow">
+      <div class="arch-step"><b>Frontend</b><span>HTML / CSS / JS</span></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-step"><b>MetaMask + ethers.js</b><span>әмиян, қолтаңба, ABI</span></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-step"><b>Ethereum (Sepolia)</b><span>транзакцияларды өңдейді</span></div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-step"><b>TodoList.sol</b><span>struct · mapping · require</span></div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    Аязбай Диас · Блокчейн технологиялары · №11 To-Do List · 2026
+  </footer>
+
+  <!-- Toast хабарламалары -->
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <!-- Өңдеу терезесі -->
+  <dialog id="editDialog" class="dialog">
+    <form id="editForm" method="dialog">
+      <h3>Тапсырманы өзгерту <span id="editId" class="muted"></span></h3>
+      <label class="field">
+        <span>Мәтін</span>
+        <textarea id="editText" class="input" rows="3"></textarea>
+        <small id="editCounter" class="counter">0 / 200 байт</small>
+      </label>
+      <label class="field">
+        <span>Маңыздылығы</span>
+        <select id="editPriority" class="input">
+          <option value="0">Төмен</option>
+          <option value="1">Орташа</option>
+          <option value="2">Жоғары</option>
+        </select>
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="editCancel" class="btn btn-ghost">Болдырмау</button>
+        <button type="submit" id="editSave" class="btn btn-primary">Сақтау</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ethers.js v6 (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+  <script>
+    // Резервтік CDN: егер jsdelivr ашылмаса
+    if (!window.ethers) {
+      document.write('<script src="https://unpkg.com/ethers@6.13.4/dist/ethers.umd.min.js"><\/script>');
+    }
+  </script>
+  <script src="contract.js"></script>
+  <script src="demo.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
